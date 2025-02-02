@@ -65,6 +65,22 @@ package can be installed from within this directory using
 
     pip install .
 
+### MacOS note
+
+When  using the  SWI-Prolog  binary installer,  the directory  holding
+`swipl` inside  the _app_ must  be added  to `PATH` and  the directory
+holding the embedded Frameworks  must be added to `DYLD_LIBRARY_PATH`.
+Using the default installation locations, the commands below should do
+this.
+
+   export PATH="/Applications/SWI-Prolog.app/Contents/MacOS:$PATH"
+   export DYLD_LIBRARY_PATH=/Applications/SWI-Prolog.app/Contents/Frameworks
+
+After setting these  variables, `swipl` should start  the command line
+version    of    SWI-Prolog    from    the    `SWI-Prolog.app`.     If
+`DYLD_LIBRARY_PATH` is not set correctly, loading `janus_swi` fails.
+
+
 
 ## Embedding Python into Prolog: library(janus)
 
