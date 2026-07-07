@@ -1887,8 +1887,12 @@ py_eval(PyObject *obj, term_t func)
   size_t arity;
   PyObject *py_res = NULL;
 
-  if ( !obj && get_py_initial_target(func, &py_res, FALSE) )
-    return py_res;
+  if ( !obj )
+  { if ( get_py_initial_target(func, &py_res, FALSE) )
+      return py_res;
+    if ( PL_exception(0) )
+      return NULL;
+  }
 
   if ( obj && PL_get_chars(func, &attr, CVT_ATOM) )
   { return check_error(PyObject_GetAttrString(obj, attr));
