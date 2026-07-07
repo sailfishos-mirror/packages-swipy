@@ -217,6 +217,22 @@ test(eval) :-
 
 test(globals, Class == dict) :-
     py_call(globals():'__class__':'__name__', Class).
+test(builtins_module, Type == module) :-
+    py_call(builtins, M, [py_object(true)]),
+    py_type(M, Type).
+test(builtins_list_class, Name == list) :-
+    py_call(builtins:list, L, [py_object(true)]),
+    py_call(L:'__name__', Name).
+test(builtins_dict_class, Name == dict) :-
+    py_call(builtins:dict, D, [py_object(true)]),
+    py_call(D:'__name__', Name).
+test(builtins_print_function, Type == builtin_function_or_method) :-
+    py_call(builtins:print, F, [py_object(true)]),
+    py_type(F, Type).
+test(builtins_construct, L == [1,2,3]) :-
+    py_call(builtins:list([1,2,3]), L).
+test(missing_module, error(python_error('ModuleNotFoundError', _))) :-
+    py_call(no_such_module_zzz, _).
 
 :- end_tests(janus_py_builtin).
 

@@ -207,6 +207,10 @@ py_version :-
 %       ?- py_call(sys:path, Path)
 %       Path = ["dir1", "dir2", ...]
 %
+%       % reference a Python builtin (class or function)
+%       ?- py_call(builtins:list, L, [py_object(true)]).
+%       L = <py_type>(...).
+%
 %   Given a class in a file `dog.py`  such as the following example from
 %   the Python documentation
 %

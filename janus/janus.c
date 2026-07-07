@@ -468,8 +468,9 @@ get_py_module(term_t name, PyObject **mod)
   { PyObject *obj;
 
     if ( id == ATOM_builtins )
-    { PyObject *builtins = PyEval_GetBuiltins();
-      Py_INCREF(builtins);
+    { PyObject *builtins = PyImport_ImportModule("builtins");
+      if ( !builtins )
+	return !!check_error(NULL);
       *mod = builtins;
       return TRUE;
     }
