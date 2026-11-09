@@ -1028,8 +1028,13 @@ py_unify_dict(term_t t, PyObject *obj, int flags, fid_t fid)
       pl_keys[pli] = PL_new_atom_wchars(len, s);
       PyMem_Free(s);
     } else if ( PyLong_Check(py_key) )
-    { if ( !(pl_keys[pli]=_PL_cons_small_int(PyLong_AsLongLong(py_key))) )
-      { invalid_keys = TRUE;
+    { int overflow = 0;
+      long long ikey = PyLong_AsLongLongAndOverflow(py_key, &overflow);
+
+      if ( overflow || (ikey == -1 && PyErr_Occurred()) ||
+	   !(pl_keys[pli]=_PL_cons_small_int(ikey)) )
+      { PyErr_Clear();
+	invalid_keys = TRUE;
 	goto out;
       }
     } else
@@ -1067,8 +1072,67 @@ py_unify_constant(term_t t, atom_t c)
 }
 
 
+/* Conversion between Python and Prolog is recursive.  Use the Python
+   recursion limit to avoid exhausting the C stack on deeply nested or
+   cyclic data.  This raises a Python RecursionError.
+*/
+
+static int py_unify_guarded(term_t t, PyObject *obj, int flags);
+static int py_from_prolog_guarded(term_t t, PyObject **obj);
+
+/* Raise error(python_error('RecursionError', Value), _).  We cannot
+   use check_error() as this converts the error using py_unify(), which
+   would hit the recursion limit again.
+*/
+
+static int
+raise_recursion_error(void)
+{ PyObject *type = NULL, *value = NULL, *stack = NULL;
+  term_t ex, av, ctx;
+  int rc;
+
+  PyErr_Fetch(&type, &value, &stack);
+  rc = ( (ex=PL_new_term_ref()) &&
+	 (ctx=PL_new_term_ref()) &&
+	 (av=PL_new_term_refs(2)) &&
+	 PL_put_atom_chars(av+0, "RecursionError") &&
+	 (value ? unify_py_obj(av+1, value)
+		: PL_unify_atom(av+1, ATOM_none)) &&
+	 PL_cons_functor_v(ex, FUNCTOR_python_error2, av) &&
+	 PL_cons_functor(ex, FUNCTOR_error2, ex, ctx) );
+  Py_XDECREF(type);
+  Py_XDECREF(value);
+  Py_XDECREF(stack);
+
+  return rc ? PL_raise_exception(ex) : FALSE;
+}
+
 static int
 py_unify(term_t t, PyObject *obj, int flags)
+{ int rc;
+
+  if ( Py_EnterRecursiveCall(" while converting a Python object to Prolog") )
+    return raise_recursion_error();
+  rc = py_unify_guarded(t, obj, flags);
+  Py_LeaveRecursiveCall();
+
+  return rc;
+}
+
+static int
+py_from_prolog(term_t t, PyObject **obj)
+{ int rc;
+
+  if ( Py_EnterRecursiveCall(" while converting a Prolog term to Python") )
+    return raise_recursion_error();
+  rc = py_from_prolog_guarded(t, obj);
+  Py_LeaveRecursiveCall();
+
+  return rc;
+}
+
+static int
+py_unify_guarded(term_t t, PyObject *obj, int flags)
 { int rc = -1;
   fid_t fid;
 
@@ -1316,7 +1380,7 @@ py_fraction_from_rational(term_t t, PyObject **obj)
 
 
 static int
-py_from_prolog(term_t t, PyObject **obj)
+py_from_prolog_guarded(term_t t, PyObject **obj)
 { size_t len;
   functor_t funct = 0;
   int done = FALSE;
@@ -1394,8 +1458,11 @@ py_from_prolog(term_t t, PyObject **obj)
   if ( PL_skip_list(t, 0, &len) == PL_LIST )
   { term_t tail = PL_copy_term_ref(t);
     term_t head = PL_new_term_ref();
-    PyObject *list = PyList_New(len);
+    PyObject *list = check_error(PyList_New(len));
     int rc = TRUE;
+
+    if ( !list )
+      return FALSE;
 
     for(Py_ssize_t i=0; PL_get_list(tail, head, tail); i++)
     { PyObject *el = NULL;

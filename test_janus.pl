@@ -164,7 +164,31 @@ test(set, Ordered == [1,2,3]) :-
     py_call(Obj, Set2),
     assertion(Set2 == py_set(Set)).
 
+test(cyclic_py, error(python_error('RecursionError', _), _)) :-
+    py_eval("(lambda a: (a.append(a), a)[1])([])", _).
+test(cyclic_dict, error(python_error('RecursionError', _), _)) :-
+    py_eval("(lambda d: (d.update({'self': d}), d)[1])({})", _).
+test(deep_py, error(python_error('RecursionError', _), _)) :-
+    py_eval("__import__('functools').reduce(lambda x, _: [x], \c
+             range(1000000), [])", _).
+test(cyclic_pl, error(python_error('RecursionError', _), _)) :-
+    X = [X],
+    py_call(len(X), _).
+test(deep_pl, error(python_error('RecursionError', _), _)) :-
+    numlist(1, 1000000, L),
+    foldl([_,A,[A]]>>true, L, [], Deep),
+    py_call(len(Deep), _).
+test(nested_ok, Len == 1) :-
+    numlist(1, 100, L),
+    foldl([_,A,[A]]>>true, L, [], Deep),
+    py_call(len(Deep), Len).
+test(big_int_key, Dict == {1180591620717411303424:a, b:1}) :-
+    py_eval("{2**70: 'a', 'b': 1}", Dict).
+
 :- end_tests(janus_data).
+
+py_eval(Expr, Value) :-
+    py_call(eval(Expr, py{}, py{}), Value).
 
 py_same_dict({D1}, {D2}) :-
     comma_list(D1, KV1),
