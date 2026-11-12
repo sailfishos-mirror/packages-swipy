@@ -808,6 +808,8 @@ py_unify_tuple(term_t t, PyObject *obj, int flags)
 { Py_ssize_t arity = PyTuple_GET_SIZE(obj);
   if ( PL_unify_compound(t, PL_new_functor(ATOM_tuple, arity)) )
   { term_t a = PL_new_term_ref();
+    if ( !a )
+      return FALSE;
     for(Py_ssize_t i=0; i<arity; i++)
     { PyObject *py_a = PyTuple_GetItem(obj, i);
       _PL_get_arg(i+1, t, a);
@@ -826,6 +828,8 @@ py_unify_sequence(term_t t, PyObject *obj, int flags)
   term_t tail = PL_copy_term_ref(t);
   term_t head = PL_new_term_ref();
 
+  if ( !tail || !head )
+    return FALSE;
   for(ssize_t i=0; i<len; i++)
   { PyObject *el = PySequence_GetItem(obj, i);
 
@@ -849,6 +853,8 @@ py_unify_iter(term_t t, PyObject *obj, int flags)
   term_t head = PL_new_term_ref();
   PyObject *item;
 
+  if ( !tail || !head )
+    return FALSE;
   while((item=PyIter_Next(obj)))
   { int rc = ( PL_unify_list(tail, head,tail) &&
 	       py_unify(head, item, flags) );
@@ -873,7 +879,8 @@ py_unify_set(term_t t, PyObject *obj, int flags)
     term_t tail = PL_new_term_ref();
     term_t head = PL_new_term_ref();
 
-    if ( !(rc=PL_unify_functor(t, FUNCTOR_py_set1)) )
+    if ( !tail || !head ||
+	 !(rc=PL_unify_functor(t, FUNCTOR_py_set1)) )
       goto out;
     _PL_get_arg(1, t, tail);
 
@@ -973,7 +980,7 @@ py_unify_dict(term_t t, PyObject *obj, int flags, fid_t fid)
   PyObject *py_key, *py_value;
   int invalid_keys = FALSE;
 
-  if ( !(pl_values = PL_new_term_refs((size_t)size)) )
+  if ( !pl_dict || !(pl_values = PL_new_term_refs((size_t)size)) )
     return FALSE;
 
   if ( size <= DICT_FAST_KEYS )
@@ -1283,7 +1290,11 @@ py_from_prolog_curl(term_t t, PyObject **obj)
   term_t head  = PL_new_term_ref();
   term_t key   = PL_new_term_ref();
   term_t value = head;
-  PyObject *py_dict = PyDict_New();
+  PyObject *py_dict;
+
+  if ( !iter || !head || !key ||
+       !(py_dict = check_error(PyDict_New())) )
+    return FALSE;
 
   _PL_get_arg(1, t, iter);
   while( PL_is_functor(iter, FUNCTOR_comma2) )
@@ -1307,6 +1318,8 @@ py_from_prolog_at1(term_t t, PyObject **obj)
 { atom_t a;
   term_t arg = PL_new_term_ref();
 
+  if ( !arg )
+    return FALSE;
   _PL_get_arg(1, t, arg);
   if ( PL_get_atom(arg, &a) )
   { int v = -1;
@@ -1388,6 +1401,8 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
   // #(Term) --> stringify
   if ( PL_is_functor(t, FUNCTOR_hash1) )
   { term_t arg = PL_new_term_ref();
+    if ( !arg )
+      return FALSE;
     _PL_get_arg(1, t, arg);
 
     PL_STRINGS_MARK();
@@ -1458,10 +1473,10 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
   if ( PL_skip_list(t, 0, &len) == PL_LIST )
   { term_t tail = PL_copy_term_ref(t);
     term_t head = PL_new_term_ref();
-    PyObject *list = check_error(PyList_New(len));
+    PyObject *list;
     int rc = TRUE;
 
-    if ( !list )
+    if ( !tail || !head || !(list = check_error(PyList_New(len))) )
       return FALSE;
 
     for(Py_ssize_t i=0; PL_get_list(tail, head, tail); i++)
@@ -1505,13 +1520,15 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
     if ( funct == FUNCTOR_py_set1 )
     { term_t tail = PL_new_term_ref();
 
+      if ( !tail )
+	return FALSE;
       _PL_get_arg(1, t, tail);
       if ( PL_skip_list(tail, 0, NULL) == PL_LIST )
       { term_t head = PL_new_term_ref();
-	PyObject *set = check_error(PySet_New(NULL));
+	PyObject *set;
 	int rc = TRUE;
 
-	if ( !set )
+	if ( !head || !(set = check_error(PySet_New(NULL))) )
 	  return FALSE;
 
 	while(PL_get_list(tail, head, tail))
@@ -1556,6 +1573,8 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
       atom_t c;
       int rc;
 
+      if ( !a )
+	return FALSE;
       _PL_get_arg(1, t, a);
 
       if ( PL_is_functor(a, FUNCTOR_curl1) )
@@ -1576,6 +1595,8 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
     if ( funct == FUNCTOR_prolog1 )
     { term_t a = PL_new_term_ref();
       PyObject *r;
+      if ( !a )
+	return FALSE;
       _PL_get_arg(1, t, a);
       if ( (r=py_record(a)) )
       { PL_reset_term_refs(a);
@@ -1593,6 +1614,10 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
       if ( tp )
       { term_t arg = PL_new_term_ref();
 
+	if ( !arg )
+	{ Py_CLEAR(tp);
+	  return FALSE;
+	}
 	for(size_t i=0; i<arity; i++)
 	{ PyObject *py_arg;
 

@@ -164,20 +164,38 @@ test(set, Ordered == [1,2,3]) :-
     py_call(Obj, Set2),
     assertion(Set2 == py_set(Set)).
 
-test(cyclic_py, error(python_error('RecursionError', _), _)) :-
-    py_eval("(lambda a: (a.append(a), a)[1])([])", _).
-test(cyclic_dict, error(python_error('RecursionError', _), _)) :-
-    py_eval("(lambda d: (d.update({'self': d}), d)[1])({})", _).
-test(deep_py, error(python_error('RecursionError', _), _)) :-
-    py_eval("__import__('functools').reduce(lambda x, _: [x], \c
-             range(1000000), [])", _).
-test(cyclic_pl, error(python_error('RecursionError', _), _)) :-
+% The conversion tests run in a thread with a bounded C stack: Python
+% 3.14 derives its recursion limit from the C stack, so under `ulimit -s
+% unlimited` it would never raise RecursionError.
+
+test(cyclic_py, [ condition(c_stack_bounded),
+                  error(python_error('RecursionError', _), _)
+                ]) :-
+    bounded_c_stack(py_eval("(lambda a: (a.append(a), a)[1])([])", _)).
+test(cyclic_dict, [ condition(c_stack_bounded),
+                    error(python_error('RecursionError', _), _)
+                  ]) :-
+    bounded_c_stack(py_eval("(lambda d: (d.update({'self': d}), d)[1])({})", _)).
+test(deep_py, [ condition(c_stack_bounded),
+                error(python_error('RecursionError', _), _)
+              ]) :-
+    bounded_c_stack(py_eval("__import__('functools').reduce(lambda x, _: [x], \c
+                             range(1000000), [])", _)).
+test(cyclic_pl, [ condition(c_stack_bounded),
+                  error(python_error('RecursionError', _), _)
+                ]) :-
     X = [X],
-    py_call(len(X), _).
-test(deep_pl, error(python_error('RecursionError', _), _)) :-
+    bounded_c_stack(py_call(len(X), _)).
+test(deep_pl, [ condition(c_stack_bounded),
+                error(python_error('RecursionError', _), _)
+              ]) :-
     numlist(1, 1000000, L),
     foldl([_,A,[A]]>>true, L, [], Deep),
-    py_call(len(Deep), _).
+    bounded_c_stack(py_call(len(Deep), _)).
+test(cyclic_pl_stack, [ condition(current_prolog_flag(threads, true)),
+                         error(resource_error(_), _)
+                       ]) :-
+    big_c_small_prolog_stack(cyclic_len).
 test(nested_ok, Len == 1) :-
     numlist(1, 100, L),
     foldl([_,A,[A]]>>true, L, [], Deep),
@@ -189,6 +207,54 @@ test(big_int_key, Dict == {1180591620717411303424:a, b:1}) :-
 
 py_eval(Expr, Value) :-
     py_call(eval(Expr, py{}, py{}), Value).
+
+%!  c_stack_bounded
+%
+%   True if we can run with a bounded C stack: with threads, or if the
+%   process has a stack limit (not `ulimit -s unlimited`).
+
+c_stack_bounded :-
+    current_prolog_flag(threads, true),
+    !.
+c_stack_bounded :-
+    exists_source(library(rlimit)),
+    use_module(library(rlimit)),
+    rlimit(stack, Limit, Limit),
+    integer(Limit).
+
+%!  bounded_c_stack(:Goal)
+%
+%   Run Goal once in a thread with an 8Mb C stack.  Without threads,
+%   just call Goal.
+
+bounded_c_stack(Goal) :-
+    \+ current_prolog_flag(threads, true),
+    !,
+    once(Goal).
+bounded_c_stack(Goal) :-
+    run_in_thread(Goal, [c_stack(8_000_000)]).
+
+run_in_thread(Goal, Options) :-
+    thread_create(Goal, Id, Options),
+    thread_join(Id, Status),
+    (   Status == true
+    ->  true
+    ;   Status = exception(E)
+    ->  throw(E)
+    ;   fail
+    ).
+
+cyclic_len :-
+    X = [X],
+    py_call(len(X), _).
+
+%!  big_c_small_prolog_stack(:Goal)
+%
+%   Run Goal in a thread that runs out of Prolog stack before Python
+%   runs out of C stack.
+
+big_c_small_prolog_stack(Goal) :-
+    run_in_thread(Goal, [c_stack(512_000_000), stack_limit(1_000_000)]).
 
 py_same_dict({D1}, {D2}) :-
     comma_list(D1, KV1),
