@@ -125,7 +125,7 @@ MurmurHashAligned2(const void * key, size_t len, unsigned int seed)
   return h;
 }
 
-static int
+static bool
 rehash(htable *t)
 { size_t newsize = t->size*2;
   size_t ebytes = sizeof(*t->entries) * newsize;
@@ -158,7 +158,7 @@ rehash(htable *t)
 }
 
 
-static int
+static bool
 py_add_hashmap(htable *t, atom_t name, PyObject *obj, PyObject **old)
 { unsigned int k;
   hcell *c;

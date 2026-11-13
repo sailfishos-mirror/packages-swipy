@@ -105,16 +105,16 @@ static PyObject *check_error(PyObject *obj);
 static int py_unify(term_t t, PyObject *obj, int flags);
 static int py_from_prolog(term_t t, PyObject **obj);
 static void py_yield_first(void);
-static int py_gil_ensure(py_gil_state *state);
+static bool py_gil_ensure(py_gil_state *state);
 static void py_gil_release(py_gil_state state);
 static void py_yield(py_gil_state state);
 static void py_resume(py_gil_state *state);
 static PyObject *py_record(term_t t);
-static int py_unify_record(term_t t, PyObject *rec);
-static int py_unify_constant(term_t t, atom_t c);
-static int py_is_record(PyObject *rec);
+static bool py_unify_record(term_t t, PyObject *rec);
+static bool py_unify_constant(term_t t, atom_t c);
+static bool py_is_record(PyObject *rec);
 static PyObject *py_free_record(PyObject *rec);
-static int unchain(term_t call, PyObject **py_target);
+static bool unchain(term_t call, PyObject **py_target);
 static PyObject *py_eval(PyObject *obj, term_t func);
 static foreign_t py_finalize(void);
 
@@ -182,7 +182,7 @@ DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
 
 #ifdef _MSC_VER
 /* Only for our purpose */
-static inline int
+static inline bool
 __sync_bool_compare_and_swap(volatile void **addr, void *old, void *new)
 {
 #if _WIN64
@@ -247,7 +247,7 @@ typedef struct py_delayed
 
 static py_delayed *delayed;
 
-static int
+static bool
 delayed_decref(void *ptr)
 { py_delayed *d = delayed;
 
@@ -385,12 +385,12 @@ static PL_blob_t PY_OBJECT = {
   acquire_python_object
 };
 
-static int
+static bool
 unify_py_obj(term_t t, PyObject *obj)
 { return PL_unify_blob(t, obj, sizeof(obj), &PY_OBJECT);
 }
 
-static int
+static bool
 get_py_obj(term_t t, PyObject **objp, int error)
 { void *data;
   size_t size;
@@ -412,7 +412,7 @@ get_py_obj(term_t t, PyObject **objp, int error)
   return false;
 }
 
-static int
+static bool
 get_py_name(term_t name, PyObject **obj, int flags)
 { char *idname;
 
@@ -435,7 +435,7 @@ static PL_option_t import_options[] =
 };
 
 
-static int
+static bool
 py_register_module(term_t name, term_t options, PyObject **mod, int flags)
 { PyObject *idobj = NULL;
   int rc = false;
@@ -480,7 +480,7 @@ out:
 }
 
 
-static int
+static bool
 get_py_module(term_t name, PyObject **mod)
 { atom_t id;
 
@@ -624,7 +624,7 @@ check_error(PyObject *obj)
 }
 
 
-static int py_unify_unicode(term_t t, PyObject *obj, int flags);
+static bool py_unify_unicode(term_t t, PyObject *obj, int flags);
 static PyObject *enum_constructor = NULL;
 
 static int
@@ -645,7 +645,7 @@ PyEnum_Check(PyObject *obj)
 }
 
 
-static int
+static bool
 py_unify_enum(term_t t, PyObject *obj)
 { PyObject *name = PyObject_GetAttrString(obj, "name");
   return py_unify_unicode(t, name, 0);
@@ -729,7 +729,7 @@ py_unify_fraction(term_t t, PyObject *obj)
 }
 
 
-static int
+static bool
 py_unify_long(term_t t, PyObject *obj)
 { int overflow;
   long long v = PyLong_AsLongLongAndOverflow(obj, &overflow);
@@ -776,7 +776,7 @@ py_unify_long(term_t t, PyObject *obj)
   }
 }
 
-static int
+static bool
 py_unify_unicode(term_t t, PyObject *obj, int flags)
 { ssize_t len;
   const char *s;
@@ -803,7 +803,7 @@ py_unify_unicode(term_t t, PyObject *obj, int flags)
   return rc;
 }
 
-static int
+static bool
 py_unify_tuple(term_t t, PyObject *obj, int flags)
 { Py_ssize_t arity = PyTuple_GET_SIZE(obj);
   if ( PL_unify_compound(t, PL_new_functor(ATOM_tuple, arity)) )
@@ -822,7 +822,7 @@ py_unify_tuple(term_t t, PyObject *obj, int flags)
   return false;
 }
 
-static int
+static bool
 py_unify_sequence(term_t t, PyObject *obj, int flags)
 { ssize_t len = PySequence_Size(obj);
   term_t tail = PL_copy_term_ref(t);
@@ -847,7 +847,7 @@ py_unify_sequence(term_t t, PyObject *obj, int flags)
   return true;
 }
 
-static int
+static bool
 py_unify_iter(term_t t, PyObject *obj, int flags)
 { term_t tail = PL_copy_term_ref(t);
   term_t head = PL_new_term_ref();
@@ -901,7 +901,7 @@ out:
   return rc;
 }
 
-static int
+static bool
 py_unify_portable_dict(term_t t, PyObject *obj, int flags)
 { PyObject *py_key, *py_value;
   Py_ssize_t i = 0;
@@ -964,7 +964,7 @@ the additional keys.   The test case is
     ?- py_call(sys:modules, M).
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
 
-static int
+static bool
 py_unify_dict(term_t t, PyObject *obj, int flags, fid_t fid)
 { if ( (flags&PYU_CURL) )
     return py_unify_portable_dict(t, obj, flags);
@@ -1073,7 +1073,7 @@ out:
 }
 
 
-static int
+static bool
 py_unify_constant(term_t t, atom_t c)
 { return PL_unify_term(t, PL_FUNCTOR, FUNCTOR_at1, PL_ATOM, c);
 }
@@ -1246,7 +1246,7 @@ out:
 }
 
 
-static int
+static bool
 add_prolog_key_value_to_dict(PyObject *py_dict, term_t tuple,
 			     term_t key, term_t value)
 { if ( PL_is_functor(tuple, FUNCTOR_key_value2) ) /* Key:Value */
@@ -1273,7 +1273,7 @@ add_prolog_key_value_to_dict(PyObject *py_dict, term_t tuple,
 }
 
 
-static int
+static bool
 py_empty_dict(PyObject **obj)
 { PyObject *py_dict = check_error(PyDict_New());
 
@@ -1284,7 +1284,7 @@ py_empty_dict(PyObject **obj)
     return false;
 }
 
-static int
+static bool
 py_from_prolog_curl(term_t t, PyObject **obj)
 { term_t iter  = PL_new_term_ref();
   term_t head  = PL_new_term_ref();
@@ -1347,7 +1347,7 @@ py_from_prolog_at1(term_t t, PyObject **obj)
 }
 
 
-static int
+static bool
 fix_ration_sep(char *s)
 { char *sep;
 
@@ -1360,7 +1360,7 @@ fix_ration_sep(char *s)
 }
 
 
-static int
+static bool
 py_fraction_from_rational(term_t t, PyObject **obj)
 { int rc = false;
 
@@ -1711,7 +1711,7 @@ py_record(term_t t)
 }
 
 
-static int
+static bool
 py_unify_record(term_t t, PyObject *rec)
 { PyObject *r = check_error(PyObject_GetAttrString(rec, "_record"));
   int rc = false;
@@ -1750,7 +1750,7 @@ py_free_record(PyObject *rec)
 }
 
 
-static int
+static bool
 py_is_record(PyObject *rec)
 { int rc;
 
@@ -1890,7 +1890,7 @@ succeeded:
 /* Get the initial target to work on
  */
 
-static int
+static bool
 get_py_initial_target(term_t t, PyObject **py_target, int error)
 { if ( get_py_obj(t, py_target, false) ||
        get_py_module(t, py_target) )
@@ -2108,7 +2108,7 @@ py_eval(PyObject *obj, term_t func)
  * returns a new reference for *py_target
  */
 
-static int
+static bool
 unchain(term_t call, PyObject **py_target)
 { term_t on = PL_new_term_ref();
   int rc = true;
@@ -2148,7 +2148,7 @@ unchain(term_t call, PyObject **py_target)
  * from the atom garbage collector we call delayed_decref();
  */
 
-static int
+static bool
 py_gil_ensure(py_gil_state *state)
 { int self = PL_thread_self();
 
@@ -2187,7 +2187,7 @@ py_gil_release(py_gil_state state)
 }
 
 
-static int
+static bool
 atom_domain_error(const char *dom, atom_t a)
 { term_t t;
 
@@ -2205,7 +2205,7 @@ static PL_option_t pycall_options[] =
 };
 
 
-static int
+static bool
 get_conversion_options(term_t options, int *flags)
 { if ( options )
   { atom_t string_as = 0;

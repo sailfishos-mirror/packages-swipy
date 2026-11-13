@@ -145,7 +145,7 @@ unify_input(term_t t, Py_ssize_t arity, PyObject *args)
     return py_unify(t, PyTuple_GetItem(args, 1), 0);
 }
 
-static int
+static bool
 keep_bindings(PyObject *args)
 { PyObject *kp;
 
@@ -473,7 +473,7 @@ swipl_open_query(PyObject *self, PyObject *args)
 }
 
 
-static int
+static bool
 Py_GetInt64Arg(int i, PyObject *tp, int64_t *vp)
 { PyObject *arg = PyList_GetItem(tp, i);
   if ( !PyLong_Check(arg) )
@@ -484,7 +484,7 @@ Py_GetInt64Arg(int i, PyObject *tp, int64_t *vp)
   return true;
 }
 
-static int
+static bool
 query_parms(PyObject *args, PyObject **tpp, fid_t *fid, qid_t *qid, term_t *av, int *keep)
 { if ( PyTuple_GET_SIZE(args) != 1 )
   { PyErr_SetString(PyExc_TypeError, "Method expects a list [fid,qid,av,keep]");
