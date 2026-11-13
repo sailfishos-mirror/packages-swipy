@@ -151,7 +151,7 @@ rehash(htable *t)
     free(t->entries);
     t->size = newsize;
     t->entries = new;
-    return FALSE;
+    return false;
   }
 
   return PL_resource_error("memory");
@@ -165,7 +165,7 @@ py_add_hashmap(htable *t, atom_t name, PyObject *obj, PyObject **old)
 
   if ( t->count > t->size )
   { if ( !rehash(t) )
-      return FALSE;
+      return false;
   }
 
   k = MurmurHashAligned2(&name, sizeof(name), SEED) % t->size;
@@ -176,7 +176,7 @@ py_add_hashmap(htable *t, atom_t name, PyObject *obj, PyObject **old)
 	  *old = c->object;
 	c->object = obj;
       }
-      return TRUE;
+      return true;
     }
   }
 
@@ -189,7 +189,7 @@ py_add_hashmap(htable *t, atom_t name, PyObject *obj, PyObject **old)
 
     PL_register_atom(name);
 
-    return TRUE;
+    return true;
   }
 
   return PL_resource_error("memory");

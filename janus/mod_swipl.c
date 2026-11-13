@@ -478,23 +478,23 @@ Py_GetInt64Arg(int i, PyObject *tp, int64_t *vp)
 { PyObject *arg = PyList_GetItem(tp, i);
   if ( !PyLong_Check(arg) )
   { PyErr_SetString(PyExc_TypeError, "query type arg must be integer");
-    return FALSE;
+    return false;
   }
   *vp = PyLong_AsLongLong(arg);
-  return TRUE;
+  return true;
 }
 
 static int
 query_parms(PyObject *args, PyObject **tpp, fid_t *fid, qid_t *qid, term_t *av, int *keep)
 { if ( PyTuple_GET_SIZE(args) != 1 )
   { PyErr_SetString(PyExc_TypeError, "Method expects a list [fid,qid,av,keep]");
-    return FALSE;
+    return false;
   }
 
   PyObject *tp = PyTuple_GetItem(args, 0);
   if ( !PyList_Check(tp) || PyList_GET_SIZE(tp) != STATE_LIST_LENGTH )
   { PyErr_SetString(PyExc_TypeError, "Method expects a list [fid,qid,av,keep]");
-    return FALSE;
+    return false;
   }
 
   int64_t tav[STATE_LIST_LENGTH];
@@ -503,13 +503,13 @@ query_parms(PyObject *args, PyObject **tpp, fid_t *fid, qid_t *qid, term_t *av, 
        !Py_GetInt64Arg(1, tp, &tav[1]) ||
        !Py_GetInt64Arg(2, tp, &tav[2]) ||
        !Py_GetInt64Arg(3, tp, &tav[3]) )
-    return FALSE;
+    return false;
   *fid  = (fid_t)tav[0];
   *qid  = (qid_t)(uintptr_t)tav[1];
   *av   = (term_t)tav[2];
   *keep = (int)tav[3];
 
-  return TRUE;
+  return true;
 }
 
 static PyObject *
@@ -517,7 +517,7 @@ swipl_next_solution(PyObject *self, PyObject *args)
 { fid_t fid;
   qid_t qid;
   term_t av;
-  int done = FALSE;
+  int done = false;
   PyObject *tp;
   int keep;
   int rc;
@@ -535,7 +535,7 @@ swipl_next_solution(PyObject *self, PyObject *args)
   switch(rc)
   { case PL_S_LAST:
       PL_cut_query(qid);
-      done = TRUE;
+      done = true;
       /*FALLTHROUGH*/
     case PL_S_TRUE:
       if ( !py_from_prolog(av+2, &out) )
@@ -550,12 +550,12 @@ swipl_next_solution(PyObject *self, PyObject *args)
     case PL_S_FALSE:
       out = PyBool_FromLong(0);
       PL_cut_query(qid);
-      done = TRUE;
+      done = true;
       break;
     case PL_S_EXCEPTION:
       Py_SetPrologError(PL_exception(qid));
       PL_cut_query(qid);
-      done = TRUE;
+      done = true;
       break;
     case PL_S_NOT_INNER:
       Py_SetPrologErrorFromChars("swipl.next_solution(): not inner query");
@@ -669,7 +669,7 @@ swipl_initialize(PyObject *self, PyObject *args)
     }
   }
 
-  py_initialize_done = TRUE;
+  py_initialize_done = true;
   if ( !PL_initialise((int)argc, (char**)argv) )
   { Py_SetPrologErrorFromChars("Failed to initialize SWI-Prolog");
     return NULL;
@@ -678,7 +678,7 @@ swipl_initialize(PyObject *self, PyObject *args)
   install_janus();
 
   fid_t fid;
-  int rc = FALSE;
+  int rc = false;
   predicate_t pred = PL_predicate("use_module", 1, "user");
 
   if ( (fid=PL_open_foreign_frame()) )
@@ -754,6 +754,6 @@ static struct PyModuleDef swipl_module =
 
 PyMODINIT_FUNC
 PyInit__swipl(void)
-{ py_module_initialize_done = TRUE;
+{ py_module_initialize_done = true;
   return PyModule_Create(&swipl_module);
 }

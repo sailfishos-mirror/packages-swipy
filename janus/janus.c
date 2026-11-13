@@ -82,9 +82,9 @@ static functor_t FUNCTOR_at1;
 static functor_t FUNCTOR_eval1;
 static functor_t FUNCTOR_string1;
 
-static int py_initialize_done = FALSE;
-static int py_module_initialize_done = FALSE;
-static int py_finalizing = FALSE;
+static int py_initialize_done = false;
+static int py_module_initialize_done = false;
+static int py_finalizing = false;
 static int py_gil_thread = 0;	/* Prolog thread that owns the GIL */
 
 #ifdef PL_Q_EXCEPT_HALT
@@ -160,7 +160,7 @@ static CRITICAL_SECTION py_mutex;
 
 BOOL WINAPI
 DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
-{ BOOL result = TRUE;
+{ BOOL result = true;
 
   switch(fdwReason)
   { case DLL_PROCESS_ATTACH:
@@ -297,7 +297,7 @@ release_python_object(atom_t symbol)
 
   if ( obj )
     delay_decref(obj);
-  return TRUE;
+  return true;
 }
 
 static int
@@ -354,7 +354,7 @@ write_python_object(IOSTREAM *s, atom_t symbol, int flags)
   { Sfprintf(s, "<py>(0x0,freed)");
   }
 
-  return TRUE;
+  return true;
 }
 
 static void
@@ -401,7 +401,7 @@ get_py_obj(term_t t, PyObject **objp, int error)
     { PyObject *obj = data;
       Py_INCREF(obj);
       *objp = obj;
-      return TRUE;
+      return true;
     } else
       return PL_existence_error("py_object", t);
   }
@@ -409,7 +409,7 @@ get_py_obj(term_t t, PyObject **objp, int error)
   if ( error )
     PL_type_error("py_object", t);
 
-  return FALSE;
+  return false;
 }
 
 static int
@@ -421,11 +421,11 @@ get_py_name(term_t name, PyObject **obj, int flags)
 
     if ( id )
     { *obj = id;
-      return TRUE;
+      return true;
     }
   }
 
-  return FALSE;
+  return false;
 }
 
 static htable *py_module_table = NULL;
@@ -438,7 +438,7 @@ static PL_option_t import_options[] =
 static int
 py_register_module(term_t name, term_t options, PyObject **mod, int flags)
 { PyObject *idobj = NULL;
-  int rc = FALSE;
+  int rc = false;
 
   if ( !py_module_table )
     py_module_table = py_new_hashmap();
@@ -471,7 +471,7 @@ py_register_module(term_t name, term_t options, PyObject **mod, int flags)
       if ( old )
 	Py_DECREF(old);
     } else
-      rc = FALSE;
+      rc = false;
   }
 
 out:
@@ -492,7 +492,7 @@ get_py_module(term_t name, PyObject **mod)
       if ( !builtins )
 	return !!check_error(NULL);
       *mod = builtins;
-      return TRUE;
+      return true;
     }
 
     if ( !py_module_table )
@@ -501,16 +501,16 @@ get_py_module(term_t name, PyObject **mod)
     if ( (obj=py_lookup_hashmap(py_module_table, id)) )
     { Py_INCREF(obj);
       *mod = obj;
-      return TRUE;
+      return true;
     } else
     { if ( py_register_module(name, 0, mod, 0) )
       { Py_INCREF(*mod);
-	return TRUE;
+	return true;
       }
     }
   }
 
-  return FALSE;
+  return false;
 }
 
 
@@ -520,7 +520,7 @@ py_update_module_cache(term_t name)
   py_gil_state state;
 
   if ( !py_gil_ensure(&state) )
-    return FALSE;
+    return false;
   rc = py_register_module(name, 0, NULL, CVT_EXCEPTION);
   py_gil_release(state);
 
@@ -534,7 +534,7 @@ py_import(term_t spec, term_t options)
   int rc;
 
   if ( !py_gil_ensure(&state) )
-    return FALSE;
+    return false;
   rc = py_register_module(spec, options, NULL, CVT_EXCEPTION);
   py_gil_release(state);
 
@@ -740,7 +740,7 @@ py_unify_long(term_t t, PyObject *obj)
   } else
   { static PyObject *hex = NULL;
     PyObject *av = NULL, *hobj = NULL;
-    int rc = FALSE;
+    int rc = false;
 
     if ( !hex )
     { PyObject *builtins = PyEval_GetBuiltins(); /* borrowed reference */
@@ -780,7 +780,7 @@ static int
 py_unify_unicode(term_t t, PyObject *obj, int flags)
 { ssize_t len;
   const char *s;
-  int rc = TRUE;
+  int rc = true;
   int uflags = REP_UTF8;
   static int tflags[] = {PL_ATOM, PL_STRING, PL_CODE_LIST, PL_CHAR_LIST};
 
@@ -788,7 +788,7 @@ py_unify_unicode(term_t t, PyObject *obj, int flags)
 
   s = PyUnicode_AsUTF8AndSize(obj, &len);
   if ( !check_error((void*)s) )
-    return FALSE;
+    return false;
   PL_STRINGS_MARK();
   term_t a = 0;
   if ( (flags&PYU_CODES) )	/* codes or chars */
@@ -809,17 +809,17 @@ py_unify_tuple(term_t t, PyObject *obj, int flags)
   if ( PL_unify_compound(t, PL_new_functor(ATOM_tuple, arity)) )
   { term_t a = PL_new_term_ref();
     if ( !a )
-      return FALSE;
+      return false;
     for(Py_ssize_t i=0; i<arity; i++)
     { PyObject *py_a = PyTuple_GetItem(obj, i);
       _PL_get_arg(i+1, t, a);
       if ( !py_unify(a, py_a, flags) )
-	return FALSE;
+	return false;
     }
     PL_reset_term_refs(a);
-    return TRUE;
+    return true;
   }
-  return FALSE;
+  return false;
 }
 
 static int
@@ -829,22 +829,22 @@ py_unify_sequence(term_t t, PyObject *obj, int flags)
   term_t head = PL_new_term_ref();
 
   if ( !tail || !head )
-    return FALSE;
+    return false;
   for(ssize_t i=0; i<len; i++)
   { PyObject *el = PySequence_GetItem(obj, i);
 
     if ( !el )
-      return FALSE;
+      return false;
     int rc = ( PL_unify_list(tail, head,tail) &&
 	       py_unify(head, el, flags) );
     Py_DECREF(el);
     if ( !rc )
-      return FALSE;
+      return false;
   }
   if ( !PL_unify_nil(tail) )
-    return FALSE;
+    return false;
 
-  return TRUE;
+  return true;
 }
 
 static int
@@ -854,25 +854,25 @@ py_unify_iter(term_t t, PyObject *obj, int flags)
   PyObject *item;
 
   if ( !tail || !head )
-    return FALSE;
+    return false;
   while((item=PyIter_Next(obj)))
   { int rc = ( PL_unify_list(tail, head,tail) &&
 	       py_unify(head, item, flags) );
     Py_DECREF(item);
     if ( !rc )
-      return FALSE;
+      return false;
   }
   if ( PL_exception(0) || !PL_unify_nil(tail) )
-    return FALSE;
+    return false;
 
-  return TRUE;
+  return true;
 }
 
 static int
 py_unify_set(term_t t, PyObject *obj, int flags)
 { PyObject *iter = PyObject_GetIter(obj);
   PyObject *item = NULL;
-  int rc = FALSE;
+  int rc = false;
 
   if ( iter )
   { PyObject *item;
@@ -913,11 +913,11 @@ py_unify_portable_dict(term_t t, PyObject *obj, int flags)
     if ( !(pl_kv=PL_new_term_ref()) ||
 	 !(tail=PL_new_term_ref()) ||
 	 !(pl_av=PL_new_term_refs(2)) )
-      return FALSE;
+      return false;
     tmp = pl_av+0;
 
     if ( !PL_unify_term(t, PL_FUNCTOR, FUNCTOR_curl1, PL_TERM, tail) )
-      return FALSE;
+      return false;
 
     while( rc  )
     { if ( !PL_put_variable(pl_av+0) ||
@@ -925,7 +925,7 @@ py_unify_portable_dict(term_t t, PyObject *obj, int flags)
 	   !py_unify(pl_av+0, py_key, flags) ||
 	   !py_unify(pl_av+1, py_value, flags) ||
 	   !PL_cons_functor_v(pl_kv, FUNCTOR_key_value2, pl_av) )
-	return FALSE;		/* pl_kv is now Key:Value */
+	return false;		/* pl_kv is now Key:Value */
 
       rc = PyDict_Next(obj, &i, &py_key, &py_value);
 
@@ -934,7 +934,7 @@ py_unify_portable_dict(term_t t, PyObject *obj, int flags)
 	     !PL_unify_term(tail, PL_FUNCTOR, FUNCTOR_comma2,
 			    PL_TERM, pl_kv, PL_TERM, tmp) ||
 	     !PL_put_term(tail, tmp) )
-	  return FALSE;
+	  return false;
       } else
       { return PL_unify(tail, pl_kv);
       }
@@ -944,7 +944,7 @@ py_unify_portable_dict(term_t t, PyObject *obj, int flags)
   }
 
   assert(0);
-  return FALSE;
+  return false;
 }
 
 
@@ -974,14 +974,14 @@ py_unify_dict(term_t t, PyObject *obj, int flags, fid_t fid)
   term_t pl_values;
   atom_t fast[DICT_FAST_KEYS];
   atom_t *pl_keys;
-  int rc = FALSE;
+  int rc = false;
   Py_ssize_t i = 0;
   Py_ssize_t pli = 0;
   PyObject *py_key, *py_value;
-  int invalid_keys = FALSE;
+  int invalid_keys = false;
 
   if ( !pl_dict || !(pl_values = PL_new_term_refs((size_t)size)) )
-    return FALSE;
+    return false;
 
   if ( size <= DICT_FAST_KEYS )
   { pl_keys = fast;
@@ -1041,11 +1041,11 @@ py_unify_dict(term_t t, PyObject *obj, int flags, fid_t fid)
       if ( overflow || (ikey == -1 && PyErr_Occurred()) ||
 	   !(pl_keys[pli]=_PL_cons_small_int(ikey)) )
       { PyErr_Clear();
-	invalid_keys = TRUE;
+	invalid_keys = true;
 	goto out;
       }
     } else
-    { invalid_keys = TRUE;
+    { invalid_keys = true;
       goto out;
     }
     if ( !py_unify(pl_values+pli, py_value, flags) )
@@ -1111,7 +1111,7 @@ raise_recursion_error(void)
   Py_XDECREF(value);
   Py_XDECREF(stack);
 
-  return rc ? PL_raise_exception(ex) : FALSE;
+  return rc ? PL_raise_exception(ex) : false;
 }
 
 static int
@@ -1145,7 +1145,7 @@ py_unify_guarded(term_t t, PyObject *obj, int flags)
 
   if ( !obj )
   { check_error(obj);
-    return FALSE;
+    return false;
   }
 
   if ( obj == Py_None )
@@ -1191,7 +1191,7 @@ py_unify_guarded(term_t t, PyObject *obj, int flags)
     }
 
     /* conversion failed on Python error: retry as reference */
-    if ( rc == FALSE && !PL_exception(0) )
+    if ( rc == false && !PL_exception(0) )
     { PyErr_Clear();
       PL_rewind_foreign_frame(fid);
       rc = -1;
@@ -1204,7 +1204,7 @@ py_unify_guarded(term_t t, PyObject *obj, int flags)
 
     return rc;
   } else
-    return FALSE;
+    return false;
 }
 
 
@@ -1263,9 +1263,9 @@ add_prolog_key_value_to_dict(PyObject *py_dict, term_t tuple,
       Py_CLEAR(py_dict);
       Py_CLEAR(py_key);
       Py_CLEAR(py_value);
-      return FALSE;
+      return false;
     } else
-      return TRUE;
+      return true;
   } else
   { Py_CLEAR(py_dict);
     return PL_type_error("py_key_value", tuple);
@@ -1279,9 +1279,9 @@ py_empty_dict(PyObject **obj)
 
   if ( py_dict )
   { *obj = py_dict;
-    return TRUE;
+    return true;
   } else
-    return FALSE;
+    return false;
 }
 
 static int
@@ -1294,7 +1294,7 @@ py_from_prolog_curl(term_t t, PyObject **obj)
 
   if ( !iter || !head || !key ||
        !(py_dict = check_error(PyDict_New())) )
-    return FALSE;
+    return false;
 
   _PL_get_arg(1, t, iter);
   while( PL_is_functor(iter, FUNCTOR_comma2) )
@@ -1302,14 +1302,14 @@ py_from_prolog_curl(term_t t, PyObject **obj)
     _PL_get_arg(2, iter, iter);
 
     if ( !add_prolog_key_value_to_dict(py_dict, head, key, value) )
-      return FALSE;
+      return false;
   }
   if ( !add_prolog_key_value_to_dict(py_dict, iter, key, value) )
-    return FALSE;
+    return false;
 
   PL_reset_term_refs(iter);
   *obj = py_dict;
-  return TRUE;
+  return true;
 }
 
 
@@ -1319,7 +1319,7 @@ py_from_prolog_at1(term_t t, PyObject **obj)
   term_t arg = PL_new_term_ref();
 
   if ( !arg )
-    return FALSE;
+    return false;
   _PL_get_arg(1, t, arg);
   if ( PL_get_atom(arg, &a) )
   { int v = -1;
@@ -1339,7 +1339,7 @@ py_from_prolog_at1(term_t t, PyObject **obj)
     if ( a == ATOM_none )
     { Py_INCREF(Py_None);
       *obj = Py_None;
-      return TRUE;
+      return true;
     }
   }
 
@@ -1353,16 +1353,16 @@ fix_ration_sep(char *s)
 
   if ( (sep=strchr(s, 'r')) )
   { *sep = '/';
-    return TRUE;
+    return true;
   }
 
-  return FALSE;
+  return false;
 }
 
 
 static int
 py_fraction_from_rational(term_t t, PyObject **obj)
-{ int rc = FALSE;
+{ int rc = false;
 
   PL_STRINGS_MARK();
   char *s;
@@ -1381,7 +1381,7 @@ py_fraction_from_rational(term_t t, PyObject **obj)
     f = check_error(PyObject_CallObject(constructor, argv));
     if ( f )
     { *obj = f;
-      rc = TRUE;
+      rc = true;
     }
   }
   Py_CLEAR(argv);
@@ -1396,20 +1396,20 @@ static int
 py_from_prolog_guarded(term_t t, PyObject **obj)
 { size_t len;
   functor_t funct = 0;
-  int done = FALSE;
+  int done = false;
 
   // #(Term) --> stringify
   if ( PL_is_functor(t, FUNCTOR_hash1) )
   { term_t arg = PL_new_term_ref();
     if ( !arg )
-      return FALSE;
+      return false;
     _PL_get_arg(1, t, arg);
 
     PL_STRINGS_MARK();
     char *s;
     if ( PL_get_nchars(arg, &len, &s, REP_UTF8|CVT_ALL|CVT_WRITE_CANONICAL) )
     { *obj = PyUnicode_FromStringAndSize(s, len);
-      done = TRUE;
+      done = true;
     }
     PL_reset_term_refs(arg);
     PL_STRINGS_RELEASE();
@@ -1425,7 +1425,7 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
 
     if ( PL_get_int64(t, &i) )
     { *obj = PyLong_FromLongLong(i);
-      return TRUE;
+      return true;
     } else
     { char *s;
       int rc;
@@ -1445,17 +1445,17 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
     }
 #undef BASE
 
-    return FALSE;
+    return false;
   }
   if ( PL_is_float(t) )
   { double f;
 
     if ( PL_get_float_ex(t, &f) )
     { *obj = PyFloat_FromDouble(f);
-      return TRUE;
+      return true;
     }
 
-    return FALSE;
+    return false;
   }
 
   // Normal text representations.  Note that [] does not qualify
@@ -1464,7 +1464,7 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
   char *s;
   if ( PL_get_nchars(t, &len, &s, REP_UTF8|CVT_ATOM|CVT_STRING) )
   { *obj = check_error(PyUnicode_FromStringAndSize(s, len));
-    done = TRUE;
+    done = true;
   }
   PL_STRINGS_RELEASE();
   if ( done )
@@ -1474,10 +1474,10 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
   { term_t tail = PL_copy_term_ref(t);
     term_t head = PL_new_term_ref();
     PyObject *list;
-    int rc = TRUE;
+    int rc = true;
 
     if ( !tail || !head || !(list = check_error(PyList_New(len))) )
-      return FALSE;
+      return false;
 
     for(Py_ssize_t i=0; PL_get_list(tail, head, tail); i++)
     { PyObject *el = NULL;
@@ -1521,15 +1521,15 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
     { term_t tail = PL_new_term_ref();
 
       if ( !tail )
-	return FALSE;
+	return false;
       _PL_get_arg(1, t, tail);
       if ( PL_skip_list(tail, 0, NULL) == PL_LIST )
       { term_t head = PL_new_term_ref();
 	PyObject *set;
-	int rc = TRUE;
+	int rc = true;
 
 	if ( !head || !(set = check_error(PySet_New(NULL))) )
-	  return FALSE;
+	  return false;
 
 	while(PL_get_list(tail, head, tail))
 	{ PyObject *el;
@@ -1539,7 +1539,7 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
 	    Py_CLEAR(el);
 	    if ( r )
 	    { check_error(NULL);
-	      rc = FALSE;
+	      rc = false;
 	      break;
 	    }
 	  } else
@@ -1559,13 +1559,13 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
     { PyObject *py_dict = check_error(PyDict_New());
 
       if ( !py_dict )
-	return FALSE;
+	return false;
       if ( PL_for_dict(t, py_add_to_dict, py_dict, 0) != 0 )
       { Py_CLEAR(py_dict);
-	return FALSE;
+	return false;
       }
       *obj = py_dict;
-      return TRUE;
+      return true;
     }
 
     if ( funct == FUNCTOR_py1 )
@@ -1574,7 +1574,7 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
       int rc;
 
       if ( !a )
-	return FALSE;
+	return false;
       _PL_get_arg(1, t, a);
 
       if ( PL_is_functor(a, FUNCTOR_curl1) )
@@ -1596,14 +1596,14 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
     { term_t a = PL_new_term_ref();
       PyObject *r;
       if ( !a )
-	return FALSE;
+	return false;
       _PL_get_arg(1, t, a);
       if ( (r=py_record(a)) )
       { PL_reset_term_refs(a);
 	*obj = r;
-	return TRUE;
+	return true;
       }
-      return FALSE;
+      return false;
     }
 
     /* -(a,b,...) --> Python tuple  */
@@ -1616,7 +1616,7 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
 
 	if ( !arg )
 	{ Py_CLEAR(tp);
-	  return FALSE;
+	  return false;
 	}
 	for(size_t i=0; i<arity; i++)
 	{ PyObject *py_arg;
@@ -1624,17 +1624,17 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
 	  _PL_get_arg(i+1, t, arg);
 	  if ( !py_from_prolog(arg, &py_arg) )
 	  { Py_CLEAR(tp);
-	    return FALSE;
+	    return false;
 	  }
 	  Py_INCREF(py_arg);
 	  PyTuple_SetItem(tp, i, py_arg);
 	}
 	PL_reset_term_refs(arg);
 	*obj = tp;
-	return TRUE;
+	return true;
       }
 
-      return FALSE;
+      return false;
     }
 
     if ( funct == FUNCTOR_eval1 )
@@ -1649,20 +1649,20 @@ py_from_prolog_guarded(term_t t, PyObject **obj)
 	Py_XDECREF(py_target);
 	if ( py_res )
 	{ *obj = py_res;
-	  return TRUE;
+	  return true;
 	}
       }
 
       Py_CLEAR(py_target);
-      return FALSE;
+      return false;
     }
   }
 
-  if ( get_py_obj(t, obj, FALSE) )
-    return TRUE;
+  if ( get_py_obj(t, obj, false) )
+    return true;
 
 error:
-  return PL_domain_error("py_term", t),FALSE;
+  return PL_domain_error("py_term", t),false;
 }
 
 
@@ -1714,7 +1714,7 @@ py_record(term_t t)
 static int
 py_unify_record(term_t t, PyObject *rec)
 { PyObject *r = check_error(PyObject_GetAttrString(rec, "_record"));
-  int rc = FALSE;
+  int rc = false;
 
   if ( r )
   { term_t tmp;
@@ -1733,14 +1733,14 @@ py_unify_record(term_t t, PyObject *rec)
 
 static PyObject *
 py_free_record(PyObject *rec)
-{ int rc = FALSE;
+{ int rc = false;
 
   if ( PyLong_Check(rec) )
   { long long v = PyLong_AsLongLong(rec);
 
     if ( v )
       PL_erase((record_t)(uintptr_t)v);
-    rc = TRUE;
+    rc = true;
   }
 
   if ( rc )
@@ -1793,12 +1793,12 @@ py_init(void)
     int rc = PL_call_predicate(NULL, PL_Q_NORMAL, pred, 0);
     if ( rc )
     { py_thread = PL_thread_self();
-      PL_thread_at_exit(py_thread_exitted, NULL, FALSE);
+      PL_thread_at_exit(py_thread_exitted, NULL, false);
     }
     return rc;
   }
 
-  return TRUE;
+  return true;
 }
 
 static foreign_t
@@ -1808,12 +1808,12 @@ py_initialize_(term_t prog, term_t Argv, term_t options)
   wchar_t **argv = NULL;
   term_t tail = PL_copy_term_ref(Argv);
   term_t head = PL_new_term_ref();
-  int rc = FALSE;
+  int rc = false;
 
   LOCK();
   if ( py_initialize_done )
   { UNLOCK();
-    return FALSE;
+    return false;
   }
 
   PL_STRINGS_MARK();
@@ -1859,9 +1859,9 @@ py_initialize_(term_t prog, term_t Argv, term_t options)
   PyConfig_Clear(&config);
 #endif
   py_yield_first();
-  py_initialize_done = TRUE;
+  py_initialize_done = true;
   PL_exit_hook(py_halt, NULL);	/* called just before exit */
-  rc = TRUE;
+  rc = true;
   goto succeeded;
 
 #ifdef PYTRY
@@ -1874,7 +1874,7 @@ py_error:
 #endif
 
 failed:
-  rc = FALSE;
+  rc = false;
 
 succeeded:
 
@@ -1892,14 +1892,14 @@ succeeded:
 
 static int
 get_py_initial_target(term_t t, PyObject **py_target, int error)
-{ if ( get_py_obj(t, py_target, FALSE) ||
+{ if ( get_py_obj(t, py_target, false) ||
        get_py_module(t, py_target) )
-    return TRUE;
+    return true;
 
   if ( error )
     PL_type_error("py_target", t);
 
-  return FALSE;
+  return false;
 }
 
 static PyObject*
@@ -2001,7 +2001,7 @@ py_eval(PyObject *obj, term_t func)
   PyObject *py_res = NULL;
 
   if ( !obj )
-  { if ( get_py_initial_target(func, &py_res, FALSE) )
+  { if ( get_py_initial_target(func, &py_res, false) )
       return py_res;
     if ( PL_exception(0) )
       return NULL;
@@ -2111,7 +2111,7 @@ py_eval(PyObject *obj, term_t func)
 static int
 unchain(term_t call, PyObject **py_target)
 { term_t on = PL_new_term_ref();
-  int rc = TRUE;
+  int rc = true;
 
   while ( PL_is_functor(call, FUNCTOR_module2) )
   { _PL_get_arg(1, call, on);
@@ -2122,7 +2122,7 @@ unchain(term_t call, PyObject **py_target)
     Py_XDECREF(*py_target);
     *py_target = next;
     if ( !next )
-    { rc = FALSE;
+    { rc = false;
       break;
     }
   }
@@ -2153,7 +2153,7 @@ py_gil_ensure(py_gil_state *state)
 { int self = PL_thread_self();
 
   if ( !py_init() )
-    return FALSE;
+    return false;
 
   state->use_gil = (self != py_thread);
   if ( state->use_gil )
@@ -2163,13 +2163,13 @@ py_gil_ensure(py_gil_state *state)
 
   py_gil_thread = self;
 #ifndef HAVE_PYGILSTATE_CHECK
-  have_gil = TRUE;
+  have_gil = true;
 #endif
 
   if ( delayed )
     delayed_decref(NULL);
 
-  return TRUE;
+  return true;
 }
 
 
@@ -2177,7 +2177,7 @@ static void
 py_gil_release(py_gil_state state)
 {
 #ifndef HAVE_PYGILSTATE_CHECK
-  have_gil = FALSE;
+  have_gil = false;
 #endif
   py_gil_thread = 0;
   if ( state.use_gil )
@@ -2214,7 +2214,7 @@ get_conversion_options(term_t options, int *flags)
 
     if ( !PL_scan_options(options, 0, "py_call_options", pycall_options,
 			  &string_as, &dict_as, &py_object) )
-      return FALSE;
+      return false;
     if ( py_object != -1 )
     { if ( py_object )
 	*flags |= PYU_OBJ;
@@ -2247,36 +2247,36 @@ get_conversion_options(term_t options, int *flags)
 
   }
 
-  return TRUE;
+  return true;
 }
 
-static int said_deprecated_setattr = FALSE;
+static int said_deprecated_setattr = false;
 
 static foreign_t
 py_call3(term_t Call, term_t result, term_t options)
 { PyObject *py_target = NULL;
   term_t call = PL_copy_term_ref(Call);
   term_t val = 0;
-  int rc = TRUE;
+  int rc = true;
   py_gil_state state;
   int uflags = 0;
 
   if ( !get_conversion_options(options, &uflags) )
-    return FALSE;
+    return false;
 
   if ( PL_is_functor(call, FUNCTOR_eq2) )
   { val = PL_new_term_ref();
     _PL_get_arg(2, call, val);
     _PL_get_arg(1, call, call);
     if ( !said_deprecated_setattr )
-    { said_deprecated_setattr = TRUE;
+    { said_deprecated_setattr = true;
       Sdprintf("Deprecated: instead of py_call(Obj:Attr = Value), "
 	       "use py_setattr(Obj,Attr,Value)");
     }
   }
 
   if ( !py_gil_ensure(&state) )
-    return FALSE;
+    return false;
 
   rc = unchain(call, &py_target);
 
@@ -2332,7 +2332,7 @@ py_setattr(term_t On, term_t name, term_t value)
   py_gil_state state;
 
   if ( !py_gil_ensure(&state) )
-    return FALSE;
+    return false;
 
   rc = unchain(on, &py_target);
   PyObject *next = py_eval(py_target, on);
@@ -2375,7 +2375,7 @@ alloc_iter_state(iter_state *state)
   { iter_state *copy = malloc(sizeof(*state));
     if ( copy )
     { *copy = *state;
-      copy->allocated = TRUE;
+      copy->allocated = true;
     }
     state = copy;
   }
@@ -2396,7 +2396,7 @@ py_iter3(term_t Iterator, term_t Result, term_t options, control_t handle)
 { iter_state iter_buf;
   iter_state *state;
   py_gil_state gil_state;
-  int rc = FALSE;
+  int rc = false;
 
   switch( PL_foreign_control(handle) )
   { case PL_FIRST_CALL:
@@ -2406,10 +2406,10 @@ py_iter3(term_t Iterator, term_t Result, term_t options, control_t handle)
       state = &iter_buf;
       memset(state, 0, sizeof(*state));
       if ( !get_conversion_options(options, &state->uflags) )
-	return FALSE;
+	return false;
 
       if ( !py_gil_ensure(&gil_state) )
-	return FALSE;
+	return false;
 
       if ( !unchain(call, &iter) )
 	goto out;
@@ -2426,17 +2426,17 @@ py_iter3(term_t Iterator, term_t Result, term_t options, control_t handle)
     case PL_REDO:
       state = PL_foreign_context_address(handle);
       if ( !py_gil_ensure(&gil_state) )
-	return FALSE;
+	return false;
       break;
     case PL_PRUNED:
       state = PL_foreign_context_address(handle);
       if ( !py_gil_ensure(&gil_state) )
-	return FALSE;
-      rc = TRUE;
+	return false;
+      rc = true;
       goto out;
     default:
       assert(0);
-      return FALSE;
+      return false;
   }
 
   fid_t fid = PL_open_foreign_frame();
@@ -2460,7 +2460,7 @@ py_iter3(term_t Iterator, term_t Result, term_t options, control_t handle)
 
       if ( PL_exception(0) )
       { PL_close_foreign_frame(fid);
-	rc = FALSE;
+	rc = false;
 	goto out;
       }
       PL_rewind_foreign_frame(fid);
@@ -2486,7 +2486,7 @@ py_with_gil(term_t goal)
 { py_gil_state state;
 
   if ( !py_gil_ensure(&state) )
-    return FALSE;
+    return false;
   int rc = PL_call(goal, NULL);
   py_gil_release(state);
 
@@ -2499,7 +2499,7 @@ py_gil_owner(term_t owner)
 { if ( py_gil_thread )
     return PL_unify_thread_id(owner, py_gil_thread);
 
-  return FALSE;
+  return false;
 }
 
 
@@ -2524,7 +2524,7 @@ py_run(term_t Cmd, term_t Globals, term_t Locals, term_t Result, term_t options)
 
     if ( !PL_scan_options(options, 0, "py_run_options", pyrun_options,
 			  &file_name, &start) )
-      return FALSE;
+      return false;
     if ( start == ATOM_file )
       start_token = Py_file_input;
     else if ( start == ATOM_eval )
@@ -2535,7 +2535,7 @@ py_run(term_t Cmd, term_t Globals, term_t Locals, term_t Result, term_t options)
       return atom_domain_error("py_run_start", start);
 
     if ( !py_gil_ensure(&state) )
-      return FALSE;
+      return false;
 
     if ( (rc = (py_from_prolog(Globals, &globals) &&
 		py_from_prolog(Locals, &locals))) )
@@ -2550,7 +2550,7 @@ py_run(term_t Cmd, term_t Globals, term_t Locals, term_t Result, term_t options)
       if ( result )
       { rc = py_unify(Result, result, 0);
       } else
-	rc = FALSE;
+	rc = false;
     }
 
     Py_CLEAR(result);
@@ -2561,7 +2561,7 @@ py_run(term_t Cmd, term_t Globals, term_t Locals, term_t Result, term_t options)
     return rc;
   }
 
-  return FALSE;
+  return false;
 }
 
 
@@ -2572,7 +2572,7 @@ py_str(term_t t, term_t str)
   py_gil_state state;
 
   if ( !py_gil_ensure(&state) )
-    return FALSE;
+    return false;
   if ( (rc=py_from_prolog(t, &obj)) )
   { PyObject *s = check_error(PyObject_Str(obj));
     Py_DECREF(obj);
@@ -2581,7 +2581,7 @@ py_str(term_t t, term_t str)
     { rc = py_unify(str, s, PYU_STRING);
       Py_DECREF(s);
     } else
-      rc = FALSE;
+      rc = false;
   }
   py_gil_release(state);
 
@@ -2617,9 +2617,9 @@ py_is_object(term_t t)
   PyObject *obj = NULL;
 
   if ( !py_gil_ensure(&state) )
-    return FALSE;
+    return false;
 
-  int rc = get_py_obj(t, &obj, FALSE);
+  int rc = get_py_obj(t, &obj, false);
   Py_CLEAR(obj);
   py_gil_release(state);
 
@@ -2678,7 +2678,7 @@ py_resume(py_gil_state *state)
 static foreign_t
 py_finalize(void)
 { if ( py_initialize_done && !py_finalizing )
-  { py_finalizing = TRUE;
+  { py_finalizing = true;
     if ( py_state.state )
     { PyEval_RestoreThread(py_state.state);
       py_state.state = NULL;
@@ -2689,15 +2689,15 @@ py_finalize(void)
     Py_FinalizeEx();
     py_thread = 0;
 
-    py_initialize_done = FALSE;
+    py_initialize_done = false;
     if ( py_module_table )
     { py_free_hashmap(py_module_table);
       py_module_table = NULL;
     }
-    py_finalizing = FALSE;
+    py_finalizing = false;
   }
 
-  return TRUE;
+  return true;
 }
 
 
