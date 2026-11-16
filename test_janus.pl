@@ -193,9 +193,9 @@ test(deep_pl, [ condition(c_stack_bounded),
     foldl([_,A,[A]]>>true, L, [], Deep),
     bounded_c_stack(py_call(len(Deep), _)).
 test(cyclic_pl_stack, [ condition(current_prolog_flag(threads, true)),
-                         error(resource_error(_), _)
+                         true(conversion_stopped(E))
                        ]) :-
-    big_c_small_prolog_stack(cyclic_len).
+    catch(big_c_small_prolog_stack(cyclic_len), E, true).
 test(nested_ok, Len == 1) :-
     numlist(1, 100, L),
     foldl([_,A,[A]]>>true, L, [], Deep),
@@ -247,6 +247,19 @@ run_in_thread(Goal, Options) :-
 cyclic_len :-
     X = [X],
     py_call(len(X), _).
+
+%!  conversion_stopped(@Error)
+%
+%   True if Error stopped converting cyclic data.  Python 3.14 derives
+%   its recursion limit from the C stack, so the Prolog stack overflows
+%   first.  Older versions have a fixed limit that is reached first.
+
+conversion_stopped(E) :-
+    nonvar(E),
+    (   subsumes_term(error(resource_error(_), _), E)
+    ->  true
+    ;   subsumes_term(error(python_error('RecursionError', _), _), E)
+    ).
 
 %!  big_c_small_prolog_stack(:Goal)
 %
